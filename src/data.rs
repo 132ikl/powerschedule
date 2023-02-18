@@ -1,6 +1,9 @@
 use std::fmt::Display;
 
-use serde::{de::Error as DeError, Deserialize, Deserializer};
+use crate::class::Class;
+
+use bitvec::{order::Lsb0, view::BitView};
+use combinations::Combinations;
 
 #[derive(Debug)]
 pub enum Error {
@@ -9,83 +12,134 @@ pub enum Error {
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{:?}", self)
+        write!(f, "{:?}", self)
     }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(try_from = "String")]
-pub struct ClassCode {
-    subject: String,
-    course: u16,
+#[derive(Clone)]
+pub struct Semester<'a>(pub Vec<&'a Class>);
+
+#[derive(Clone)]
+pub struct Schedule<'a> {
+    remaining: Vec<&'a Class>,
+    semesters: Vec<&'a Semester<'a>>,
 }
 
-impl ClassCode {
-    pub fn new(subject: String, course: u16) -> Self {
-        return ClassCode { subject, course };
+impl<'a> Semester<'a> {
+    pub fn new(classes: Vec<&'a Class>) -> Self {
+        Semester(classes)
     }
-}
 
-#[derive(Debug, Deserialize)]
-pub struct ClassCodes(Vec<ClassCode>);
-
-#[derive(Debug, Deserialize)]
-pub struct Class {
-    name: ClassCode,
-    credits: u8,
-    #[serde(deserialize_with = "empty_string_is_none")]
-    prerequisites: Option<ClassCodes>,
-    #[serde(deserialize_with = "empty_string_is_none")]
-    corequisites: Option<ClassCodes>,
-}
-
-impl Class {
-    pub fn name(&self) -> String {
-        format!("{}{}", self.name.subject, self.name.course)
+    pub fn credits(&self) -> u16 {
+        self.0
+            .iter()
+            .fold(0, |acc, class| acc + (class.credits as u16))
     }
-}
 
-fn empty_string_is_none<'de, D>(deserializer: D) -> Result<Option<ClassCodes>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    match s.is_empty() {
-        true => Ok(None),
-        false => Ok(Some(
-            s.try_into()
-                .map_err(|e: Error| DeError::custom(e.to_string()))?,
-        )),
-    }
-}
-
-impl TryFrom<String> for ClassCode {
-    type Error = Error;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        if value.len() != 6 {
-            return Err(Error::ConvertError(format!(
-                "Class code {} must be 6 characters long",
-                value
-            )));
+    pub fn is_valid(&self) -> bool {
+        let credits = self.credits();
+        if credits < 12 || credits > 20 {
+            return false;
         }
 
-        let (subject, code) = value.split_at(3);
-        let course: u16 = code.parse().map_err(|_| -> Error {
-            Error::ConvertError(format!("Failed to convert course code {} to integer", code))
-        })?;
-        Ok(ClassCode::new(subject.to_string(), course))
+        return true;
     }
 }
 
-impl TryFrom<String> for ClassCodes {
-    type Error = Error;
+impl<'a> From<Vec<&'a Class>> for Semester<'a> {
+    fn from(value: Vec<&'a Class>) -> Self {
+        Semester::new(value)
+    }
+}
 
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        let classes: Vec<ClassCode> = value
-            .split("|")
-            .map(|x| x.to_string().try_into())
-            .try_collect::<Vec<ClassCode>>()?;
-        Ok(Self(classes))
+impl<'a> FromIterator<&'a Class> for Semester<'a> {
+    fn from_iter<T: IntoIterator<Item = &'a Class>>(iter: T) -> Self {
+        let mut semester = Semester::new(Vec::new());
+        for class in iter {
+            semester.0.push(class);
+        }
+        semester
+    }
+}
+
+impl<'a> Display for Semester<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let names: Vec<String> = self.0.iter().map(|class| class.name()).collect();
+        write!(f, "{}", names.join(", "))
+    }
+}
+
+impl<'a> Schedule<'a> {
+    pub fn new(classes: &'a Vec<Class>) -> Self {
+        let mut sched = Schedule {
+            remaining: Vec::new(),
+            semesters: Vec::new(),
+        };
+        sched.remaining = classes.iter().collect();
+        sched
+    }
+
+    pub fn child<'b>(&self, semester: &'b Semester) -> Schedule<'b>
+    where
+        'a: 'b,
+    {
+        let remaining: Vec<&Class> = self
+            .remaining
+            .clone()
+            .into_iter()
+            .filter(|class| !semester.0.contains(class))
+            .collect();
+
+        let mut semesters: Vec<&'b Semester<'b>> = self.semesters.clone();
+        semesters.push(semester);
+
+        Schedule {
+            remaining,
+            semesters,
+        }
+    }
+
+    pub fn generate_possible(&self) -> Vec<Semester> {
+        let mut sorted = self.remaining.clone();
+        sorted.sort_unstable_by_key(|x| x.credits);
+
+        let mut accum = 0;
+        let mut max = 0;
+        for val in sorted.iter() {
+            max += 1;
+            accum += val.credits;
+            if accum >= 20 {
+                break;
+            }
+        }
+
+        accum = 0;
+        sorted.reverse();
+        let mut min = 0;
+        for x in sorted {
+            min += 1;
+            accum += x.credits;
+            if accum >= 12 {
+                break;
+            }
+        }
+
+        (min..max)
+            .into_iter()
+            .map(|i| Combinations::new(self.remaining.clone(), i))
+            .flatten()
+            .map(|x| x.into())
+            .filter(|x: &Semester| x.is_valid())
+            .collect()
+    }
+}
+
+impl<'a> Display for Schedule<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Schedule {{")?;
+        for (i, semester) in self.semesters.iter().enumerate() {
+            writeln!(f, "\t{}: {} ({} credits)", i, semester, semester.credits())?;
+        }
+        writeln!(f, "}}")
     }
 }

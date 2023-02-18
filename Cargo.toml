@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 bitvec = "1.0.1"
+combinations = "0.1.0"
 csv = "1.2.0"
 serde = { version = "1.0.152", features = ["derive"] }
