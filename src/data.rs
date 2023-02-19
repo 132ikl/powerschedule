@@ -20,9 +20,16 @@ impl Display for Error {
 pub struct Semester<'a>(pub Vec<&'a Class>);
 
 #[derive(Clone)]
-pub struct Schedule<'a> {
+pub enum SemesterWrap<'a> {
+    Some(Semester<'a>),
+    None,
+}
+
+#[derive(Clone)]
+pub struct Schedule<'a, 'b> {
     remaining: Vec<&'a Class>,
-    semesters: Vec<&'a Semester<'a>>,
+    pub semesters: Vec<&'b SemesterWrap<'a>>,
+    own: SemesterWrap<'a>,
 }
 
 impl<'a> Semester<'a> {
@@ -31,9 +38,7 @@ impl<'a> Semester<'a> {
     }
 
     pub fn credits(&self) -> u16 {
-        self.0
-            .iter()
-            .fold(0, |acc, class| acc + (class.credits as u16))
+        self.0.iter().map(|class| class.credits as u16).sum()
     }
 
     pub fn is_valid(&self) -> bool {
@@ -69,37 +74,49 @@ impl<'a> Display for Semester<'a> {
     }
 }
 
-impl<'a> Schedule<'a> {
+pub struct Intermediate<'a, 'b>(pub Semester<'a>, pub Schedule<'a, 'b>);
+
+impl<'a, 'b> Schedule<'a, 'b> {
     pub fn new(classes: &'a Vec<Class>) -> Self {
         let mut sched = Schedule {
             remaining: Vec::new(),
             semesters: Vec::new(),
+            own: SemesterWrap::None,
         };
         sched.remaining = classes.iter().collect();
         sched
     }
 
-    pub fn child<'b>(&self, semester: &'b Semester) -> Schedule<'b>
+    pub fn child<'c>(&'c self, semester: Semester<'a>) -> Schedule<'a, 'b>
     where
-        'a: 'b,
+        'c: 'b,
     {
-        let remaining: Vec<&Class> = self
+        let remaining: Vec<&'a Class> = self
             .remaining
             .clone()
             .into_iter()
             .filter(|class| !semester.0.contains(class))
             .collect();
 
-        let mut semesters: Vec<&'b Semester<'b>> = self.semesters.clone();
-        semesters.push(semester);
+        let mut semesters: Vec<&'b SemesterWrap<'a>> = self.semesters.clone();
+        semesters.push(&self.own);
 
         Schedule {
             remaining,
             semesters,
+            own: SemesterWrap::Some(semester),
         }
+        // Intermediate(semester, sched)
     }
 
-    pub fn generate_possible(&self) -> Vec<Semester> {
+    pub fn generate_children<'c>(&'c self) -> Vec<Schedule<'a, 'c>> {
+        self.generate_possible()
+            .into_iter()
+            .map(|sem| self.child(sem))
+            .collect()
+    }
+
+    fn generate_possible(&self) -> Vec<Semester<'a>> {
         let mut sorted = self.remaining.clone();
         sorted.sort_unstable_by_key(|x| x.credits);
 
@@ -116,7 +133,7 @@ impl<'a> Schedule<'a> {
         accum = 0;
         sorted.reverse();
         let mut min = 0;
-        for x in sorted {
+        for x in sorted.iter() {
             min += 1;
             accum += x.credits;
             if accum >= 12 {
@@ -126,7 +143,10 @@ impl<'a> Schedule<'a> {
 
         (min..max)
             .into_iter()
-            .map(|i| Combinations::new(self.remaining.clone(), i))
+            .map(|i| {
+                let clone: Vec<&'a Class> = self.remaining.clone();
+                Combinations::new(clone, i)
+            })
             .flatten()
             .map(|x| x.into())
             .filter(|x: &Semester| x.is_valid())
@@ -134,11 +154,13 @@ impl<'a> Schedule<'a> {
     }
 }
 
-impl<'a> Display for Schedule<'a> {
+impl<'a> Display for Schedule<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Schedule {{")?;
         for (i, semester) in self.semesters.iter().enumerate() {
-            writeln!(f, "\t{}: {} ({} credits)", i, semester, semester.credits())?;
+            if let SemesterWrap::Some(semester) = semester {
+                writeln!(f, "\t{}: {} ({} credits)", i, semester, semester.credits())?;
+            }
         }
         writeln!(f, "}}")
     }
