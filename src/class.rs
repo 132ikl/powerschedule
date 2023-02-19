@@ -99,7 +99,7 @@ where
 pub struct ClassList(Vec<Class>);
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ClassIdx(usize);
+pub struct ClassIdx(u8);
 
 impl ClassList {
     pub fn new(classes: Vec<Class>) -> Self {
@@ -107,7 +107,7 @@ impl ClassList {
     }
 
     pub fn all(&self) -> Vec<ClassIdx> {
-        (0..self.0.len()).map(|i| ClassIdx(i)).collect()
+        (0..self.0.len()).map(|i| ClassIdx(i as _)).collect()
     }
 }
 
@@ -115,12 +115,12 @@ impl Index<ClassIdx> for ClassList {
     type Output = Class;
 
     fn index(&self, index: ClassIdx) -> &Self::Output {
-        &self.0[index.0]
+        &self.0[index.0 as usize]
     }
 }
 
 impl IndexMut<ClassIdx> for ClassList {
     fn index_mut(&mut self, index: ClassIdx) -> &mut Self::Output {
-        &mut self.0[index.0]
+        &mut self.0[index.0 as usize]
     }
 }

@@ -70,8 +70,14 @@ pub struct SemesterList(Vec<Semester>);
 pub struct SemesterIdx(usize);
 
 impl SemesterList {
-    pub fn new(semesters: Vec<Semester>) -> Self {
-        Self(semesters)
+    pub fn new() -> Self {
+        Self(vec![])
+    }
+
+    pub fn push(&mut self, new_semester: Semester) -> SemesterIdx {
+        let idx = self.0.len();
+        self.0.push(new_semester);
+        SemesterIdx(idx)
     }
 }
 

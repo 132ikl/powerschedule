@@ -1,6 +1,6 @@
 use combinations::Combinations;
 
-use crate::class::{ClassIdx, ClassList};
+use crate::class::{self, ClassIdx, ClassList};
 use crate::semester::{Semester, SemesterIdx, SemesterList};
 
 #[derive(Clone)]
@@ -10,19 +10,21 @@ pub struct Schedule {
 }
 
 impl Schedule {
-    pub fn new(classes: Vec<ClassIdx>) -> Self {
+    pub fn new_toplevel(classes: &ClassList) -> Self {
+        let remaining = classes.all();
+
         Schedule {
-            remaining: classes,
+            remaining,
             semesters: Vec::new(),
         }
     }
 
-    pub fn child(&self, semester: SemesterIdx, semesters: &SemesterList) -> Schedule {
+    pub fn child(&self, semester: SemesterIdx, semesterlist: &SemesterList) -> Schedule {
         let remaining: Vec<ClassIdx> = self
             .remaining
-            .clone()
-            .into_iter()
-            .filter(|class| !semesters[semester].0.contains(class))
+            .iter()
+            .copied()
+            .filter(|class| !semesterlist[semester].0.contains(class))
             .collect();
 
         let mut semesters = self.semesters.clone();
@@ -34,7 +36,11 @@ impl Schedule {
         }
     }
 
-    pub fn generate_possible(&self, classlist: &ClassList) -> Vec<Semester> {
+    pub fn generate_possible<'a>(
+        &'a self,
+        classlist: &'a ClassList,
+        semesterlist: &'a mut SemesterList,
+    ) -> impl Iterator<Item = Schedule> + 'a {
         let mut sorted = self.remaining.clone();
         sorted.sort_unstable_by_key(|&idx| classlist[idx].credits);
 
@@ -65,7 +71,12 @@ impl Schedule {
             .flatten()
             .map(|x| x.into())
             .filter(|x: &Semester| x.is_valid(classlist))
-            .collect()
+            .map(move |new_semester| {
+                let new_idx = semesterlist.push(new_semester);
+                let child = self.child(new_idx, semesterlist);
+                // println!("  {}", child.print(&classlist, &semesterlist));
+                child
+            })
     }
 
     pub fn print<'a>(
@@ -89,13 +100,19 @@ pub struct ScheduleDisplay<'a> {
 
 impl<'a> std::fmt::Display for ScheduleDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Schedule {{")?;
+        write!(f, "Schedule {{")?;
         for (i, &semesteridx) in self.schedule.semesters.iter().enumerate() {
             let semester = &self.semesterlist[semesteridx];
             let semesterprint = semester.print(self.classlist);
             let credits = semester.credits(self.classlist);
-            writeln!(f, "\t{i}: {semesterprint} ({credits} credits)",)?;
+            write!(f, "\t{i}: {semesterprint} ({credits} credits)")?;
         }
-        writeln!(f, "}}")
+        write!(f, " }}")
     }
 }
+
+// pub struct ScheduleHistory {
+//     classlist: ClassList,
+//     semesterlist: SemesterList,
+//     schedules_per_semester: Vec<
+// }
