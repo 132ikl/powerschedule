@@ -95,6 +95,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct ClassList(Vec<Class>);
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]

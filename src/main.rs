@@ -34,6 +34,10 @@ use semester::Semester;
 //     scheds
 // }
 
+fn step_schedules(input: &[Schedule], sems: &mut Vec<(Schedule, Semester)>) -> Vec<Schedule> {
+    todo!()
+}
+
 fn main() -> Result<()> {
     let mut rdr = Reader::from_path("input.csv").unwrap();
 
@@ -44,15 +48,17 @@ fn main() -> Result<()> {
 
     // dbg!(&classes);
 
-    let classes = ClassList::new(classes);
+    let classlist = ClassList::new(classes);
 
     // let mut scheds: Vec<Vec<Schedule>> = Vec::new();
     // let mut sems: Vec<Vec<(&Schedule, Semester)>> = Vec::new();
-    let top: Vec<Schedule> = vec![Schedule::new(classes.all())];
+    let top: Vec<Schedule> = vec![Schedule::new(classlist.all())];
 
-    let x = top[0].generate_possible(&classes);
+    let x = top[0].generate_possible(&classlist);
 
-    for (i, x) in x.into_iter().enumerate() {}
+    for (i, x) in x.into_iter().enumerate() {
+        println!("{i}, {}", x.print(&classlist));
+    }
 
     // (0..8).for_each(|_| sems.push(Vec::new()));
     // let [a, b, c, d, e, f, g, h] = sems.get_many_mut([0, 1, 2, 3, 4, 5, 6, 7]).unwrap();

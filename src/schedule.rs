@@ -34,15 +34,15 @@ impl Schedule {
         }
     }
 
-    pub fn generate_possible(&self, classes: &ClassList) -> Vec<Semester> {
+    pub fn generate_possible(&self, classlist: &ClassList) -> Vec<Semester> {
         let mut sorted = self.remaining.clone();
-        sorted.sort_unstable_by_key(|&x| classes[x].credits);
+        sorted.sort_unstable_by_key(|&idx| classlist[idx].credits);
 
         let mut accum = 0;
         let mut max = 0;
-        for &val in &sorted {
+        for &idx in &sorted {
             max += 1;
-            accum += classes[val].credits;
+            accum += classlist[idx].credits;
             if accum >= 20 {
                 break;
             }
@@ -51,9 +51,9 @@ impl Schedule {
         let mut accum = 0;
         sorted.reverse();
         let mut min = 0;
-        for x in sorted {
+        for &idx in &sorted {
             min += 1;
-            accum += classes[x].credits;
+            accum += classlist[idx].credits;
             if accum >= 12 {
                 break;
             }
@@ -64,17 +64,38 @@ impl Schedule {
             .map(|i| Combinations::new(self.remaining.clone(), i))
             .flatten()
             .map(|x| x.into())
-            .filter(|x: &Semester| x.is_valid(classes))
+            .filter(|x: &Semester| x.is_valid(classlist))
             .collect()
+    }
+
+    pub fn print<'a>(
+        &'a self,
+        classlist: &'a ClassList,
+        semesterlist: &'a SemesterList,
+    ) -> ScheduleDisplay<'a> {
+        ScheduleDisplay {
+            schedule: self,
+            classlist,
+            semesterlist,
+        }
     }
 }
 
-// impl<'a> Display for Schedule<'a> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         writeln!(f, "Schedule {{")?;
-//         for (i, semester) in self.semesters.iter().enumerate() {
-//             writeln!(f, "\t{}: {} ({} credits)", i, semester, semester.credits())?;
-//         }
-//         writeln!(f, "}}")
-//     }
-// }
+pub struct ScheduleDisplay<'a> {
+    schedule: &'a Schedule,
+    classlist: &'a ClassList,
+    semesterlist: &'a SemesterList,
+}
+
+impl<'a> std::fmt::Display for ScheduleDisplay<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Schedule {{")?;
+        for (i, &semesteridx) in self.schedule.semesters.iter().enumerate() {
+            let semester = &self.semesterlist[semesteridx];
+            let semesterprint = semester.print(self.classlist);
+            let credits = semester.credits(self.classlist);
+            writeln!(f, "\t{i}: {semesterprint} ({credits} credits)",)?;
+        }
+        writeln!(f, "}}")
+    }
+}

@@ -25,6 +25,13 @@ impl Semester {
 
         return true;
     }
+
+    pub fn print<'a>(&'a self, classlist: &'a ClassList) -> SemesterDisplay<'a> {
+        SemesterDisplay {
+            semester: self,
+            classlist,
+        }
+    }
 }
 
 impl From<Vec<ClassIdx>> for Semester {
@@ -39,12 +46,22 @@ impl FromIterator<ClassIdx> for Semester {
     }
 }
 
-// impl<'a> Display for Semester<'a> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         let names: Vec<String> = self.0.iter().map(|class| class.name()).collect();
-//         write!(f, "{}", names.join(", "))
-//     }
-// }
+pub struct SemesterDisplay<'a> {
+    semester: &'a Semester,
+    classlist: &'a ClassList,
+}
+
+impl<'a> std::fmt::Display for SemesterDisplay<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let names: Vec<String> = self
+            .semester
+            .0
+            .iter()
+            .map(|&idx| self.classlist[idx].name())
+            .collect();
+        write!(f, "{}", names.join(", "))
+    }
+}
 
 #[derive(Clone)]
 pub struct SemesterList(Vec<Semester>);
