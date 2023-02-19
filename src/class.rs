@@ -1,6 +1,8 @@
-use crate::data::Error;
+use std::ops::{Index, IndexMut};
 
 use serde::{de::Error as DeError, Deserialize, Deserializer};
+
+use crate::error::Error;
 
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(try_from = "String")]
@@ -90,5 +92,34 @@ where
             s.try_into()
                 .map_err(|e: Error| DeError::custom(e.to_string()))?,
         )),
+    }
+}
+
+pub struct ClassList(Vec<Class>);
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ClassIdx(usize);
+
+impl ClassList {
+    pub fn new(classes: Vec<Class>) -> Self {
+        Self(classes)
+    }
+
+    pub fn all(&self) -> Vec<ClassIdx> {
+        (0..self.0.len()).map(|i| ClassIdx(i)).collect()
+    }
+}
+
+impl Index<ClassIdx> for ClassList {
+    type Output = Class;
+
+    fn index(&self, index: ClassIdx) -> &Self::Output {
+        &self.0[index.0]
+    }
+}
+
+impl IndexMut<ClassIdx> for ClassList {
+    fn index_mut(&mut self, index: ClassIdx) -> &mut Self::Output {
+        &mut self.0[index.0]
     }
 }
