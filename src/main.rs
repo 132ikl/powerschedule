@@ -3,6 +3,7 @@
 #![feature(get_many_mut)]
 mod class;
 mod data;
+mod requirements;
 
 use std::rc::Rc;
 
