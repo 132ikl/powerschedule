@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, rc::Rc};
 
 use crate::class::Class;
 
@@ -17,16 +17,16 @@ impl Display for Error {
 }
 
 #[derive(Clone)]
-pub struct Semester<'a>(pub Vec<&'a Class>);
+pub struct Semester(pub Vec<Rc<Class>>);
 
 #[derive(Clone)]
-pub struct Schedule<'a> {
-    remaining: Vec<&'a Class>,
-    semesters: Vec<&'a Semester<'a>>,
+pub struct Schedule {
+    remaining: Vec<Rc<Class>>,
+    semesters: Vec<Rc<Semester>>,
 }
 
-impl<'a> Semester<'a> {
-    pub fn new(classes: Vec<&'a Class>) -> Self {
+impl Semester {
+    pub fn new(classes: Vec<Rc<Class>>) -> Self {
         Semester(classes)
     }
 
@@ -46,14 +46,14 @@ impl<'a> Semester<'a> {
     }
 }
 
-impl<'a> From<Vec<&'a Class>> for Semester<'a> {
-    fn from(value: Vec<&'a Class>) -> Self {
+impl From<Vec<Rc<Class>>> for Semester {
+    fn from(value: Vec<Rc<Class>>) -> Self {
         Semester::new(value)
     }
 }
 
-impl<'a> FromIterator<&'a Class> for Semester<'a> {
-    fn from_iter<T: IntoIterator<Item = &'a Class>>(iter: T) -> Self {
+impl FromIterator<Rc<Class>> for Semester {
+    fn from_iter<T: IntoIterator<Item = Rc<Class>>>(iter: T) -> Self {
         let mut semester = Semester::new(Vec::new());
         for class in iter {
             semester.0.push(class);
@@ -62,36 +62,33 @@ impl<'a> FromIterator<&'a Class> for Semester<'a> {
     }
 }
 
-impl<'a> Display for Semester<'a> {
+impl Display for Semester {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let names: Vec<String> = self.0.iter().map(|class| class.name()).collect();
         write!(f, "{}", names.join(", "))
     }
 }
 
-impl<'a> Schedule<'a> {
-    pub fn new(classes: &'a Vec<Class>) -> Self {
+impl Schedule {
+    pub fn new(classes: &Vec<Rc<Class>>) -> Self {
         let mut sched = Schedule {
             remaining: Vec::new(),
             semesters: Vec::new(),
         };
-        sched.remaining = classes.iter().collect();
+        sched.remaining = classes.clone();
         sched
     }
 
-    pub fn child<'b>(&self, semester: &'b Semester) -> Schedule<'b>
-    where
-        'a: 'b,
-    {
-        let remaining: Vec<&Class> = self
+    pub fn child(&self, semester: Rc<Semester>) -> Schedule {
+        let remaining: Vec<Rc<Class>> = self
             .remaining
             .clone()
             .into_iter()
             .filter(|class| !semester.0.contains(class))
             .collect();
 
-        let mut semesters: Vec<&'b Semester<'b>> = self.semesters.clone();
-        semesters.push(semester);
+        let mut semesters: Vec<Rc<Semester>> = self.semesters.clone();
+        semesters.push(semester.clone());
 
         Schedule {
             remaining,
@@ -99,7 +96,7 @@ impl<'a> Schedule<'a> {
         }
     }
 
-    pub fn generate_possible(&self) -> Vec<Semester> {
+    pub fn generate_possible(&self) -> Vec<Rc<Semester>> {
         let mut sorted = self.remaining.clone();
         sorted.sort_unstable_by_key(|x| x.credits);
 
@@ -130,11 +127,12 @@ impl<'a> Schedule<'a> {
             .flatten()
             .map(|x| x.into())
             .filter(|x: &Semester| x.is_valid())
+            .map(|x| Rc::new(x))
             .collect()
     }
 }
 
-impl<'a> Display for Schedule<'a> {
+impl Display for Schedule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Schedule {{")?;
         for (i, semester) in self.semesters.iter().enumerate() {
