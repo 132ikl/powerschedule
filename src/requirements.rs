@@ -1,32 +1,31 @@
 pub use parser::parse;
 
-// implement on Schedule for example
-trait TestRequisite {
-    fn has_prerequisite(&self, requisite: RequisiteName) -> bool;
-    fn has_corequisite(&self, requisite: RequisiteName) -> bool;
+pub trait TestRequisite {
+    fn has_prerequisite(&self, requisite: &RequisiteName) -> bool;
+    fn has_corequisite(&self, requisite: &RequisiteName) -> bool;
 }
 
 // sample
 #[derive(Default)]
 pub struct RequesiteRegistry<'a> {
-    prerequisites: &'a [RequisiteName<'a>],
-    corequisites: &'a [RequisiteName<'a>],
+    prerequisites: &'a [RequisiteName],
+    corequisites: &'a [RequisiteName],
 }
 
 impl TestRequisite for RequesiteRegistry<'_> {
-    fn has_prerequisite(&self, requisite: RequisiteName) -> bool {
-        self.prerequisites.contains(&requisite)
+    fn has_prerequisite(&self, requisite: &RequisiteName) -> bool {
+        self.prerequisites.contains(requisite)
     }
-    fn has_corequisite(&self, requisite: RequisiteName) -> bool {
-        self.corequisites.contains(&requisite)
+    fn has_corequisite(&self, requisite: &RequisiteName) -> bool {
+        self.corequisites.contains(requisite)
     }
 }
 
-trait EvalExpression<T: ?Sized> {
+pub trait EvalExpression<T: ?Sized> {
     fn eval(&self, requisites_list: &T) -> bool;
 }
 
-pub type RequisiteName<'a> = &'a str; // probably need to change either this or Class
+pub type RequisiteName = String; // probably need to change either this or Class
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum RequisiteType {
@@ -35,30 +34,30 @@ pub enum RequisiteType {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
-pub struct Requisite<'a> {
+pub struct Requisite {
     pub typ: RequisiteType,
-    pub name: RequisiteName<'a>,
+    pub name: RequisiteName,
 }
 
-impl<T: TestRequisite + ?Sized> EvalExpression<T> for Requisite<'_> {
+impl<T: TestRequisite + ?Sized> EvalExpression<T> for Requisite {
     fn eval(&self, requisites_list: &T) -> bool {
         match self.typ {
-            RequisiteType::Pre => requisites_list.has_prerequisite(self.name),
+            RequisiteType::Pre => requisites_list.has_prerequisite(&self.name),
             RequisiteType::Co => {
-                requisites_list.has_prerequisite(self.name)
-                    || requisites_list.has_corequisite(self.name)
+                requisites_list.has_prerequisite(&self.name)
+                    || requisites_list.has_corequisite(&self.name)
             }
         }
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Primary<'a> {
-    Req(Requisite<'a>),
-    Expr(Expression<'a>),
+pub enum Primary {
+    Req(Requisite),
+    Expr(Expression),
 }
 
-impl<T: TestRequisite + ?Sized> EvalExpression<T> for Primary<'_> {
+impl<T: TestRequisite + ?Sized> EvalExpression<T> for Primary {
     fn eval(&self, requisites_list: &T) -> bool {
         match self {
             Primary::Req(requesite) => requesite.eval(requisites_list),
@@ -68,27 +67,27 @@ impl<T: TestRequisite + ?Sized> EvalExpression<T> for Primary<'_> {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct OrExpression<'a>(pub Vec<Primary<'a>>);
+pub struct OrExpression(pub Vec<Primary>);
 
-impl<T: TestRequisite + ?Sized> EvalExpression<T> for OrExpression<'_> {
+impl<T: TestRequisite + ?Sized> EvalExpression<T> for OrExpression {
     fn eval(&self, requisites_list: &T) -> bool {
         self.0.iter().any(|expr| expr.eval(requisites_list))
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
-pub struct AndExpression<'a>(pub Vec<OrExpression<'a>>);
+pub struct AndExpression(pub Vec<OrExpression>);
 
-impl<T: TestRequisite + ?Sized> EvalExpression<T> for AndExpression<'_> {
+impl<T: TestRequisite + ?Sized> EvalExpression<T> for AndExpression {
     fn eval(&self, requisites_list: &T) -> bool {
         self.0.iter().all(|expr| expr.eval(requisites_list))
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
-pub struct Expression<'a>(pub AndExpression<'a>);
+pub struct Expression(pub AndExpression);
 
-impl<T: TestRequisite + ?Sized> EvalExpression<T> for Expression<'_> {
+impl<T: TestRequisite + ?Sized> EvalExpression<T> for Expression {
     fn eval(&self, requisites_list: &T) -> bool {
         self.0.eval(requisites_list)
     }
@@ -143,13 +142,16 @@ mod parser {
         context("requesite_type", requesite_type)(input)
     }
 
-    fn requisite<'a, E: Err<'a>>(input: &'a str) -> IResult<&'a str, Requisite<'a>, E> {
+    fn requisite<'a, E: Err<'a>>(input: &'a str) -> IResult<&'a str, Requisite, E> {
         let requesite = pair(class_name, requesite_type);
-        let requesite = requesite.map(|(name, typ)| Requisite { name, typ });
+        let requesite = requesite.map(|(name, typ)| Requisite {
+            name: name.to_string(),
+            typ,
+        });
         context("requesite", requesite)(input)
     }
 
-    fn primary<'a, E: Err<'a>>(input: &'a str) -> IResult<&'a str, Primary<'a>, E> {
+    fn primary<'a, E: Err<'a>>(input: &'a str) -> IResult<&'a str, Primary, E> {
         let req = requisite.map(Primary::Req);
         let and = parenthesis_helper(expression).map(Primary::Expr);
 
@@ -171,22 +173,22 @@ mod parser {
         separated_list1(delimited(multispace0, tag(word), multispace0), parser)
     }
 
-    fn or_expression<'a, E: Err<'a>>(input: &'a str) -> IResult<&'a str, OrExpression<'a>, E> {
+    fn or_expression<'a, E: Err<'a>>(input: &'a str) -> IResult<&'a str, OrExpression, E> {
         let expr = expression_helper("or", primary).map(OrExpression);
         context("or_expression", expr)(input)
     }
 
-    fn and_expression<'a, E: Err<'a>>(input: &'a str) -> IResult<&'a str, AndExpression<'a>, E> {
+    fn and_expression<'a, E: Err<'a>>(input: &'a str) -> IResult<&'a str, AndExpression, E> {
         let expr = expression_helper("and", or_expression).map(AndExpression);
         context("and_expression", expr)(input)
     }
 
-    fn expression<'a, E: Err<'a>>(input: &'a str) -> IResult<&'a str, Expression<'a>, E> {
+    fn expression<'a, E: Err<'a>>(input: &'a str) -> IResult<&'a str, Expression, E> {
         let expression = and_expression.map(Expression);
         context("expression", preceded(multispace0, expression))(input)
     }
 
-    fn toplevel<'a, E: Err<'a>>(input: &'a str) -> IResult<&'a str, Expression<'a>, E> {
+    fn toplevel<'a, E: Err<'a>>(input: &'a str) -> IResult<&'a str, Expression, E> {
         let empty = multispace0.map(|_| Expression::default());
         let toplevel = alt((expression, empty));
         context("toplevel", toplevel)(input)
@@ -249,7 +251,7 @@ mod parser {
     }
 
     #[allow(unused)]
-    pub fn parse(input: &str) -> Expression<'_> {
+    pub fn parse(input: &str) -> Expression {
         verbose(toplevel, input).unwrap()
     }
 }

@@ -1,24 +1,29 @@
-use crate::data::Error;
+use crate::data::{Schedule, Term};
+use crate::requirements::{parse, EvalExpression, Expression};
 
-use serde::{de::Error as DeError, Deserialize, Deserializer};
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct Class {
     subject: String,
     number: u16,
     pub credits: u8,
+    pub required: bool,
+    pub semesters: String,
     requisites: String,
+    #[serde(skip)]
+    parsed_reqs: Option<Expression>,
 }
 
 impl PartialOrd for Class {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.credits.cmp(&other.credits))
+        Some(self.name().cmp(&other.name()))
     }
 }
 
 impl Ord for Class {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.credits.cmp(&other.credits)
+        self.name().cmp(&other.name())
     }
 }
 
@@ -26,6 +31,14 @@ impl Eq for Class {}
 
 impl Class {
     pub fn name(&self) -> String {
-        format!("{}{}", self.subject, self.number)
+        format!("{} {}", self.subject, self.number)
+    }
+
+    pub fn requisites_met(&self, schedule: &Schedule) -> bool {
+        parse(&self.requisites).eval(schedule)
+    }
+
+    pub fn offered(&self, term: &Term) -> bool {
+        self.semesters.split("|").any(|sem| term.matches(sem))
     }
 }
