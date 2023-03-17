@@ -30,17 +30,26 @@ fn main() {
     let mut rdr = Reader::from_path("input.csv").unwrap();
 
     let classes_taken: Vec<String> = vec![
+        // PHY
         "PHY 183".to_string(),
         "PHY 184".to_string(),
+        "PHY 191".to_string(),
+        // MISC
+        "CEM 141".to_string(),
+        "EGR 100".to_string(),
+        "WRA 101".to_string(),
+        // ECE
         "ECE 201".to_string(),
-        "ECE 390".to_string(),
-        "CSE 331".to_string(),
+        "ECE 390".to_string(), // CSE 300
+        // MTH
         "MTH 132".to_string(),
         "MTH 133".to_string(),
         "MTH 234".to_string(),
+        // CSE
         "CSE 231".to_string(),
         "CSE 232".to_string(),
         "CSE 260".to_string(),
+        "CSE 331".to_string(),
     ];
 
     let classes: Vec<Rc<Class>> = rdr
@@ -58,8 +67,5 @@ fn main() {
         scheds = step_schedules(scheds);
     }
 
-    scheds
-        .iter()
-        .filter(|sched| sched.is_complete(&classes))
-        .for_each(|x| println!("{}", x));
+    scheds.iter().for_each(|x| println!("{}", x));
 }

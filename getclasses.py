@@ -27,12 +27,18 @@ class Course:
     semesters: str
     credits: int
     requisites: str
+    required: str = "true"
 
     @classmethod
     def from_raw(cls, course, divs):
         semesters = "|".join(format_semester(sem) for sem in divs[0].text.split(", "))
         credits = int(re.match(r"Total Credits: (\d+)", divs[1].text)[1])
-        requisites = divs[2].text
+        requisites = re.sub(
+            "Completion of Tier I Writing Requirement",
+            "WRA 101",
+            divs[2].text,
+            flags=re.I,
+        )
         return Course(course[:3], course[3:], semesters, credits, requisites)
 
     def __repr__(self):
@@ -75,8 +81,17 @@ courses = [get_course_data(browser, course) for course in raw_courses]
 with open("input.csv", "w") as csvfile:
     writer = DictWriter(
         csvfile,
-        fieldnames=["subject", "number", "credits", "semesters", "requisites"],
+        fieldnames=[
+            "subject",
+            "number",
+            "credits",
+            "required",
+            "semesters",
+            "requisites",
+        ],
     )
     writer.writeheader()
     for course in courses:
         writer.writerow(asdict(course))
+
+browser.quit()

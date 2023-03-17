@@ -5,7 +5,6 @@ use crate::requirements::TestRequisite;
 use crate::{class::Class, requirements::RequisiteName};
 
 use combinations::Combinations;
-use serde::de::value;
 
 pub struct Semester(pub Vec<Rc<Class>>, pub Term);
 
@@ -130,17 +129,9 @@ impl Schedule {
         return true;
     }
 
-    pub fn is_complete(&self, classes: &Vec<Rc<Class>>) -> bool {
-        let all_classes = self
-            .semesters
-            .iter()
-            .map(|x| x.0.clone())
-            .flatten()
-            .collect::<Vec<Rc<Class>>>();
-        classes
-            .iter()
-            .filter(|x| x.required)
-            .all(|class| all_classes.contains(class))
+    #[allow(unused)]
+    pub fn is_complete(&self) -> bool {
+        !self.remaining.iter().any(|class| class.required)
     }
 
     pub fn child(&self, semester: Rc<Semester>) -> Option<Schedule> {
@@ -250,6 +241,15 @@ impl Display for Schedule {
                 semester.credits()
             )?;
         }
+        writeln!(
+            f,
+            "Remaining: {}",
+            self.remaining
+                .iter()
+                .map(|x| x.name())
+                .collect::<Vec<String>>()
+                .join(", ")
+        )?;
         writeln!(f)
     }
 }
