@@ -1,14 +1,17 @@
 use std::fmt;
 use std::{fmt::Display, rc::Rc};
 
+use crate::config::Config;
 use crate::requirements::TestRequisite;
 use crate::{class::Class, requirements::RequisiteName};
 
 use combinations::Combinations;
+use serde::Deserialize;
+use thiserror::Error;
 
 pub struct Semester(pub Vec<Rc<Class>>, pub Term);
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Deserialize)]
 pub enum TermSeason {
     Spring,
     #[allow(unused)]
@@ -16,10 +19,28 @@ pub enum TermSeason {
     Fall,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Deserialize)]
 pub struct Term {
     pub season: TermSeason,
     pub year: u16,
+}
+
+impl Display for Term {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!("{:?} {}", self.season, self.year))
+    }
+}
+
+#[derive(Error, Debug, PartialEq, Eq, Hash)]
+pub enum ScheduleError {
+    #[error("Too few credits")]
+    TooFewCredits,
+    #[error("Too many credits")]
+    TooManyCredits,
+    #[error("Not available in term {0}")]
+    NotAvailable(String),
+    #[error("Requisites for class un-met")]
+    RequisitesUnmet,
 }
 
 impl Term {
@@ -76,17 +97,20 @@ impl Semester {
             .fold(0, |acc, class| acc + (class.credits as u16))
     }
 
-    pub fn is_valid(&self) -> bool {
+    pub fn verify(self, config: &Config) -> Result<Rc<Self>, ScheduleError> {
         let credits = self.credits();
-        if credits < 12 || credits > 20 {
-            return false;
+        if credits < config.min_credits.into() {
+            return Err(ScheduleError::TooFewCredits);
+        }
+        if credits > config.max_credits.into() {
+            return Err(ScheduleError::TooManyCredits);
         }
 
         if !self.0.iter().all(|class| class.offered(&self.1)) {
-            return false;
+            return Err(ScheduleError::NotAvailable(self.1.to_string()));
         }
 
-        return true;
+        return Ok(Rc::new(self));
     }
 }
 
@@ -115,7 +139,7 @@ impl Schedule {
         sched
     }
 
-    pub fn is_valid(&self) -> bool {
+    pub fn is_valid(&self) -> Result<(), ScheduleError> {
         if !self
             .semesters
             .iter()
@@ -123,10 +147,10 @@ impl Schedule {
             .flatten()
             .all(|class| class.requisites_met(self))
         {
-            return false;
+            return Err(ScheduleError::RequisitesUnmet);
         };
 
-        return true;
+        return Ok(());
     }
 
     #[allow(unused)]
@@ -134,7 +158,7 @@ impl Schedule {
         !self.remaining.iter().any(|class| class.required)
     }
 
-    pub fn child(&self, semester: Rc<Semester>) -> Option<Schedule> {
+    pub fn child(&self, semester: Rc<Semester>) -> Result<Schedule, ScheduleError> {
         let remaining: Vec<Rc<Class>> = self
             .remaining
             .clone()
@@ -153,12 +177,12 @@ impl Schedule {
         };
 
         match new.is_valid() {
-            true => Some(new),
-            false => None,
+            Ok(_) => Ok(new),
+            Err(err) => Err(err),
         }
     }
 
-    pub fn generate_possible(&self) -> Vec<Rc<Semester>> {
+    pub fn generate_possible(&self, config: &Config) -> Vec<Result<Rc<Semester>, ScheduleError>> {
         let mut sorted = self.remaining.clone();
         sorted.sort_unstable_by_key(|x| x.credits);
 
@@ -167,7 +191,7 @@ impl Schedule {
         for val in sorted.iter() {
             max += 1;
             accum += val.credits;
-            if accum >= 20 {
+            if accum >= config.max_credits {
                 break;
             }
         }
@@ -179,7 +203,7 @@ impl Schedule {
         for x in sorted {
             min += 1;
             accum += x.credits;
-            if accum >= 12 {
+            if accum >= config.min_credits {
                 break;
             }
         }
@@ -200,8 +224,7 @@ impl Schedule {
 
         candidates
             .into_iter()
-            .filter(|x: &Semester| x.is_valid())
-            .map(|x| Rc::new(x))
+            .map(|x: Semester| x.verify(config))
             .collect()
     }
 }

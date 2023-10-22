@@ -3,3 +3,5 @@ input.csv
 geckodriver.log
 venv
 input.txt
+config.toml
+taken.txt
