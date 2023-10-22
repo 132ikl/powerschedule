@@ -7,7 +7,7 @@ mod requirements;
 
 use std::rc::Rc;
 
-use csv::Reader;
+use csv::ReaderBuilder;
 
 use class::Class;
 use data::{Schedule, Term, TermSeason};
@@ -27,7 +27,10 @@ fn step_schedules<'a>(input: Vec<Schedule>) -> Vec<Schedule> {
 }
 
 fn main() {
-    let mut rdr = Reader::from_path("input.csv").unwrap();
+    let mut rdr = ReaderBuilder::new()
+        .comment(Some(b'#'))
+        .from_path("input.csv")
+        .unwrap();
 
     let classes_taken: Vec<String> = vec![
         // PHY

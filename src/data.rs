@@ -189,11 +189,17 @@ impl Schedule {
             None => self.first_term,
         };
 
-        (min..=max)
+        // try subsets of remaining classes and all remaining classes
+        let mut candidates: Vec<Semester> = (min..=max)
             .into_iter()
             .map(|i| Combinations::new(self.remaining.clone(), i))
             .flatten()
             .map(|x| (x, term).into())
+            .collect();
+        candidates.push((self.remaining.clone(), term).into());
+
+        candidates
+            .into_iter()
             .filter(|x: &Semester| x.is_valid())
             .map(|x| Rc::new(x))
             .collect()
