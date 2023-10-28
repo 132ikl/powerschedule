@@ -10,6 +10,7 @@ use std::{fs, rc::Rc};
 
 use config::Config;
 use csv::ReaderBuilder;
+use yansi::Paint;
 
 use class::Class;
 use data::{Schedule, ScheduleError};
@@ -83,12 +84,24 @@ fn main() {
         errors.extend(errors_split);
     }
 
-    scheds.iter().for_each(|x| {
-        println!("{}", x);
-        println!("Complete: {}", x.completeness_display(&config));
-        println!("");
-    });
-    println!("Errors:");
+    scheds
+        .iter()
+        .sorted_by(|a, b| a.total_credits().cmp(&b.total_credits()))
+        .for_each(|x| {
+            println!("{}", x);
+            println!(
+                "{} {}",
+                "Complete:".yellow().bold(),
+                x.completeness_display(&config)
+            );
+            println!("");
+        });
+
+    println!(
+        "{}{}",
+        "Errors".bold().bright_red(),
+        "".white().dim().linger()
+    );
     let err_counts = errors.iter().counts();
     err_counts
         .iter()

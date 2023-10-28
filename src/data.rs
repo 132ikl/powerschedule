@@ -9,6 +9,7 @@ use crate::{class::Class, requirements::RequisiteName};
 use combinations::Combinations;
 use serde::Deserialize;
 use thiserror::Error;
+use yansi::{Paint, Painted};
 
 pub struct Semester(pub Vec<Rc<Class>>, pub Term);
 
@@ -151,6 +152,15 @@ impl Schedule {
         return Ok(());
     }
 
+    pub fn total_credits(&self) -> u16 {
+        self.semesters
+            .iter()
+            .map(|x| x.0.clone())
+            .flatten()
+            .map(|x| x.credits as u16)
+            .sum()
+    }
+
     pub fn meets_group_credits(&self, config: &Config) -> bool {
         let classes = self.semesters.iter().map(|x| x.0.clone()).flatten();
         let mut groups: BTreeMap<String, u8> = config.groups.clone();
@@ -182,11 +192,11 @@ impl Schedule {
         Ok(())
     }
 
-    pub fn completeness_display(&self, config: &Config) -> &str {
+    pub fn completeness_display(&self, config: &Config) -> Painted<&str> {
         match self.is_complete(&config) {
-            Ok(_) => "Yes",
-            Err(ScheduleError::RequirementsUnmet) => "No, requirements unmet",
-            Err(ScheduleError::GroupsUnmet) => "No, group credit requirement unmet",
+            Ok(_) => "Yes".green(),
+            Err(ScheduleError::RequirementsUnmet) => "No, requirements unmet".red(),
+            Err(ScheduleError::GroupsUnmet) => "No, group credit requirement unmet".red(),
             Err(_) => panic!("Unknown completeness error"),
         }
     }
@@ -297,23 +307,32 @@ impl TestRequisite for Schedule {
 impl Display for Schedule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for semester in self.semesters.iter() {
+            write!(
+                f,
+                "{} {}{} ",
+                semester.1.season.bold().blue(),
+                semester.1.year.bold().blue(),
+                ":".bold().blue()
+            )?;
+            write!(f, "{} ", semester.green())?;
             writeln!(
                 f,
-                "{} {}: {} ({} credits)",
-                semester.1.season,
-                semester.1.year,
-                semester,
+                "{}({} credits)",
+                "".bright_black().linger(),
                 semester.credits()
             )?;
         }
         write!(
             f,
-            "Remaining: {}",
+            "{} {}",
+            "Remaining:".bold().white().dim(),
             self.remaining
                 .iter()
                 .map(|x| x.name())
                 .collect::<Vec<String>>()
                 .join(", ")
+                .white()
+                .dim()
         )
     }
 }
