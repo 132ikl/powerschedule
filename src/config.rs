@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::Deserialize;
 
 use crate::data::Term;
@@ -8,4 +10,5 @@ pub struct Config {
     pub max_credits: u8,
     pub semesters: u8,
     pub starting_term: Term,
+    pub groups: BTreeMap<String, u8>,
 }

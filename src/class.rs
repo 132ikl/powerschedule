@@ -9,6 +9,7 @@ pub struct Class {
     number: u16,
     pub credits: u8,
     pub required: bool,
+    groups: String,
     pub semesters: String,
     requisites: String,
     #[serde(skip)]
@@ -40,5 +41,12 @@ impl Class {
 
     pub fn offered(&self, term: &Term) -> bool {
         self.semesters.split("|").any(|sem| term.matches(sem))
+    }
+
+    pub fn groups(&self) -> Vec<&str> {
+        if self.groups.is_empty() {
+            return Vec::new();
+        }
+        self.groups.split("|").collect()
     }
 }

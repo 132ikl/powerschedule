@@ -83,7 +83,11 @@ fn main() {
         errors.extend(errors_split);
     }
 
-    scheds.iter().for_each(|x| println!("{}", x));
+    scheds.iter().for_each(|x| {
+        println!("{}", x);
+        println!("Complete: {}", x.completeness_display(&config));
+        println!("");
+    });
     println!("Errors:");
     let err_counts = errors.iter().counts();
     err_counts

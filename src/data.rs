@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt;
 use std::{fmt::Display, rc::Rc};
 
@@ -10,6 +11,22 @@ use serde::Deserialize;
 use thiserror::Error;
 
 pub struct Semester(pub Vec<Rc<Class>>, pub Term);
+
+#[derive(Error, Debug, PartialEq, Eq, Hash)]
+pub enum ScheduleError {
+    #[error("Too few credits")]
+    TooFewCredits,
+    #[error("Too many credits")]
+    TooManyCredits,
+    #[error("Not available in term {0}")]
+    NotAvailable(String),
+    #[error("Requisites for class un-met")]
+    RequisitesUnmet,
+    #[error("Doesn't fulfill required courses")]
+    RequirementsUnmet,
+    #[error("Did not meet credit requirement for group")]
+    GroupsUnmet,
+}
 
 #[derive(Debug, Copy, Clone, Deserialize)]
 pub enum TermSeason {
@@ -29,18 +46,6 @@ impl Display for Term {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!("{:?} {}", self.season, self.year))
     }
-}
-
-#[derive(Error, Debug, PartialEq, Eq, Hash)]
-pub enum ScheduleError {
-    #[error("Too few credits")]
-    TooFewCredits,
-    #[error("Too many credits")]
-    TooManyCredits,
-    #[error("Not available in term {0}")]
-    NotAvailable(String),
-    #[error("Requisites for class un-met")]
-    RequisitesUnmet,
 }
 
 impl Term {
@@ -92,9 +97,7 @@ impl Semester {
     }
 
     pub fn credits(&self) -> u16 {
-        self.0
-            .iter()
-            .fold(0, |acc, class| acc + (class.credits as u16))
+        self.0.iter().map(|class| class.credits as u16).sum()
     }
 
     pub fn verify(self, config: &Config) -> Result<Rc<Self>, ScheduleError> {
@@ -140,22 +143,52 @@ impl Schedule {
     }
 
     pub fn is_valid(&self) -> Result<(), ScheduleError> {
-        if !self
-            .semesters
-            .iter()
-            .map(|x| x.0.clone())
-            .flatten()
-            .all(|class| class.requisites_met(self))
-        {
+        let mut classes = self.semesters.iter().map(|x| x.0.clone()).flatten();
+        if !classes.all(|class| class.requisites_met(self)) {
             return Err(ScheduleError::RequisitesUnmet);
         };
 
         return Ok(());
     }
 
-    #[allow(unused)]
-    pub fn is_complete(&self) -> bool {
-        !self.remaining.iter().any(|class| class.required)
+    pub fn meets_group_credits(&self, config: &Config) -> bool {
+        let classes = self.semesters.iter().map(|x| x.0.clone()).flatten();
+        let mut groups: BTreeMap<String, u8> = config.groups.clone();
+        groups.values_mut().for_each(|v| *v = 0);
+
+        // this is definitely not efficient lol
+        for class in classes {
+            for group in class.groups() {
+                let group_val = groups
+                    .get_mut(group)
+                    .expect("Class has a group which is not present in config");
+                *group_val += class.credits;
+            }
+        }
+        // safety: will keys always be in same order? we're cloning, so it seems like yes, but not actually doing anything to ensure that
+        groups
+            .iter()
+            .zip(&config.groups)
+            .all(|(this, other)| this.1 >= other.1)
+    }
+
+    pub fn is_complete(&self, config: &Config) -> Result<(), ScheduleError> {
+        if self.remaining.iter().any(|class| class.required) {
+            return Err(ScheduleError::RequirementsUnmet);
+        };
+        if !self.meets_group_credits(&config) {
+            return Err(ScheduleError::GroupsUnmet);
+        }
+        Ok(())
+    }
+
+    pub fn completeness_display(&self, config: &Config) -> &str {
+        match self.is_complete(&config) {
+            Ok(_) => "Yes",
+            Err(ScheduleError::RequirementsUnmet) => "No, requirements unmet",
+            Err(ScheduleError::GroupsUnmet) => "No, group credit requirement unmet",
+            Err(_) => panic!("Unknown completeness error"),
+        }
     }
 
     pub fn child(&self, semester: Rc<Semester>) -> Result<Schedule, ScheduleError> {
@@ -220,7 +253,10 @@ impl Schedule {
             .flatten()
             .map(|x| (x, term).into())
             .collect();
-        candidates.push((self.remaining.clone(), term).into());
+        let remaining_credits: u16 = self.remaining.iter().map(|x| x.credits as u16).sum();
+        if remaining_credits <= config.max_credits.into() {
+            candidates.push((self.remaining.clone(), term).into());
+        };
 
         candidates
             .into_iter()
@@ -270,7 +306,7 @@ impl Display for Schedule {
                 semester.credits()
             )?;
         }
-        writeln!(
+        write!(
             f,
             "Remaining: {}",
             self.remaining
@@ -278,7 +314,6 @@ impl Display for Schedule {
                 .map(|x| x.name())
                 .collect::<Vec<String>>()
                 .join(", ")
-        )?;
-        writeln!(f)
+        )
     }
 }

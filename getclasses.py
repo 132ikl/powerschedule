@@ -28,6 +28,7 @@ class Course:
     credits: int
     requisites: str
     required: str = "true"
+    groups: str = ""
 
     @classmethod
     def from_raw(cls, course, divs):
@@ -86,6 +87,7 @@ with open("input.csv", "w") as csvfile:
             "number",
             "credits",
             "required",
+            "groups",
             "semesters",
             "requisites",
         ],
