@@ -1,0 +1,6 @@
+min_credits = 12
+max_credits = 20
+semesters = 3
+starting_term = { season = "Spring", year = 2024 }
+# 6 credits must be from core track, 15 from focus tracks, 21 from electives and one class (at least one credit) must be a lab
+groups = { core = 6, focus = 15, elective = 21, lab = 1 }

@@ -1,0 +1,7 @@
+subject,number,credits,required,groups,semesters,requisites
+ABC,101,5,true,,Spring,ABC 100
+ABC,102,5,true,,Fall|Spring,ABC 101
+ABC,200,2,false,,Fall|Spring,
+ABC,220,2,false,,Fall|Spring,ABC 101 and ABC 200
+XYZ,100,4,false,GroupA,Fall|Spring,ABC 101
+XYZ,200,1,false,GroupA,Fall|Spring,ABC 220 or XYZ 100
