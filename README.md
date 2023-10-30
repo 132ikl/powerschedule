@@ -25,6 +25,7 @@ Powerschedule sources data from three files: `input.csv`, `taken.txt`, and `conf
   * `semesters`: the number of future semesters to calculate
   * `starting_term`: the first term to generate a schedule for
   * `groups`: groups of courses which need to meet a certain minimum credit threshold for a schedule to be complete. for example, if you need 10 credits from a certain category of courses, add a group for the category and mark each course which counts towards that group in `input.csv`.
+  * `show_incomplete`: whether to show course schedules which do not include required classes or do not fulfill group credit requirement
 
 Powerschedule currently requires Rust nightly. Install it with `rustup toolchain install nightly`, and run powerschedule with `cargo +nightly run --release` (optionally, set nightly to your default toolchain with `rustup default nightly`).
 

@@ -3,3 +3,4 @@ max_credits = 10
 semesters = 3
 starting_term = { season = "Spring", year = 2024 }
 groups = { GroupA = 5 }
+show_incomplete = true

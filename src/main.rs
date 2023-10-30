@@ -86,6 +86,7 @@ fn main() {
 
     scheds
         .iter()
+        .filter(|x| config.show_incomplete || x.is_complete(&config).is_ok())
         .sorted_by(|a, b| a.total_credits().cmp(&b.total_credits()))
         .for_each(|x| {
             println!("{}", x);
