@@ -4,6 +4,9 @@ Putting together a multi-semester course schedule for university is extremely di
 
 Powerschedule was primarily designed to work with MSU's academic calendar, but could be adapted to work for other universities as well. Additionally, Powerschedule uses MSU's course requisite/corequisite syntax.
 
+![Example output from powerschedule](/demo.png)
+
+
 ## Usage
 
 Disclaimer: I am not liable for any faulty logic in powerschedule or faulty data given to powerschedule causing you to be unable to schedule classes or graduate on time. Double check your schedule manually and verify with an academic advisor before using output from powerschedule.
