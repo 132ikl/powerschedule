@@ -40,7 +40,8 @@ class Course:
             divs[2].text,
             flags=re.I,
         )
-        return Course(course[:3], course[3:], semesters, credits, requisites)
+        subject, number = course.split(" ")
+        return Course(subject, number, semesters, credits, requisites)
 
     def __repr__(self):
         out = f"{self.subject} {self.number} (\n"
